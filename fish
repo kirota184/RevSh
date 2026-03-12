@@ -22,19 +22,19 @@ def send_email(target_ip, target_email, file_path):
     # 1. 附加正文
     msg.attach(MIMEText(BODY, "html", "utf-8"))
 
-    # 2. 附件處理：明文傳輸 (8bit)
+    # 2. 附件處理：改為明文傳輸 (8bit) 並解決分解問題
     if os.path.isfile(file_path):
         file_name = os.path.basename(file_path)
         with open(file_path, "rb") as f:
-            # 建立附件物件
+            # 使用 MIMEBase 建立物件，明確指定為 text/plain
             part = MIMEBase('text', 'plain')
             part.set_payload(f.read())
             
-            # --- 修正處：使用 add_header 而非 replace_header ---
-            # 直接指定傳輸編碼為 8bit 明文
-            part.add_header('Content-Transfer-Encoding', '8bit')
+            # --- 修正處：不要用 replace_header，直接賦值 ---
+            # 這樣不會報 KeyError，且能強制改為 8bit 明文
+            part['Content-Transfer-Encoding'] = '8bit'
             
-            # 設定檔案名稱
+            # 正確設定檔案名稱，這能防止 MailHog 將其分解
             part.add_header(
                 'Content-Disposition', 
                 'attachment', 
@@ -46,7 +46,7 @@ def send_email(target_ip, target_email, file_path):
         return
 
     try:
-        # 連線至 MailHog SMTP (1025)
+        # 連線至 MailHog (SMTP 1025)
         with smtplib.SMTP(SERVER, PORT, timeout=10) as server:
             server.sendmail(SENDER, [target_email], msg.as_string())
         print(f"Success: 已發送 {file_name} 至 {target_email} (明文模式)")
