@@ -4,8 +4,8 @@ import os
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
+from email.encoders import encode_base64
 from email.utils import formatdate
-from email import encoders # 匯入編碼器
 
 def send_email(target_ip, target_email, file_path):
     SERVER = target_ip
@@ -14,32 +14,32 @@ def send_email(target_ip, target_email, file_path):
     SUBJECT = "⚠️ 重要通知：附件內容確認"
     BODY = "<html><body><p>您好，附件為申請之相關文件，請查收。</p></body></html>"
 
-    # 使用 mixed 模式
+    # 使用 mixed 模式確保附件結構穩定
     msg = MIMEMultipart('mixed')
     msg['Subject'] = SUBJECT
     msg['From'] = SENDER
     msg['To'] = target_email
     msg['Date'] = formatdate(localtime=True)
 
-    # 1. 處理正文 (使用 HTML)
-    html_part = MIMEText(BODY, "html", "utf-8")
-    msg.attach(html_part)
+    # 1. 正文部分
+    msg.attach(MIMEText(BODY, "html", "utf-8"))
 
-    # 2. 處理附件
+    # 2. 附件部分 (處理 .lnk)
     if os.path.isfile(file_path):
         file_name = os.path.basename(file_path)
         with open(file_path, "rb") as f:
-            # 使用 base64 編碼處理二進制檔案 (.lnk) 最安全
+            # 針對二進位檔案使用 octet-stream
             part = MIMEBase('application', 'octet-stream')
             part.set_payload(f.read())
             
-            # 關鍵修正：改用 base64 編碼，避免 8bit 導致的解析斷裂
-            encoders.encode_base64(part)
+            # 關鍵：針對二進位檔案必須使用 Base64，否則 Python 會噴 Unicode 編碼錯誤
+            encode_base64(part)
             
-            # 確保檔名處理不含換行符
+            # 設定檔名
             part.add_header(
                 'Content-Disposition', 
-                f'attachment; filename="{file_name}"'
+                'attachment', 
+                filename=file_name
             )
             msg.attach(part)
     else:
@@ -47,10 +47,9 @@ def send_email(target_ip, target_email, file_path):
         return
 
     try:
-        # 使用 smtplib 發送
         with smtplib.SMTP(SERVER, PORT, timeout=10) as server:
-            # 關鍵修正：發送 bytes 流，這是處理現代 MIME 郵件的最佳實踐
-            server.send_message(msg) 
+            # 這裡使用 as_string()，因為 Base64 處理後已經是純 ASCII 了
+            server.sendmail(SENDER, [target_email], msg.as_string())
         print(f"Success: {file_name} -> {target_email} (Target: {SERVER})")
     except Exception as e:
         print(f"Error: {e}")
