@@ -21,23 +21,23 @@ def send_email(target_ip, target_email, file_path):
     msg['To'] = target_email
     msg['Date'] = formatdate(localtime=True)
 
-    # 1. 處理正文：強制使用 8bit 明文，不使用 Base64
-    # 這樣 MailHog 就不會把它當成附件下載項
-    html_part = MIMEText(BODY, "html", "utf-8")
-    html_part.replace_header('Content-Transfer-Encoding', '8bit')
+    # 1. 處理正文：強制使用 7bit/8bit 明文，不經過 MIMEText 的自動 Base64 邏輯
+    html_part = MIMEBase('text', 'html', charset='utf-8')
+    html_part.set_payload(BODY.encode('utf-8'))
+    # 這裡不要用 add_header，直接設定這個屬性來確保不被轉碼
+    html_part['Content-Transfer-Encoding'] = '8bit'
     msg.attach(html_part)
 
-    # 2. 處理 .lnk 附件：必須使用 Base64
+    # 2. 處理 .lnk 附件：必須使用 Base64 避免編碼報錯
     if os.path.isfile(file_path):
         file_name = os.path.basename(file_path)
         with open(file_path, "rb") as f:
             part = MIMEBase('application', 'octet-stream')
             part.set_payload(f.read())
             
-            # 二進位檔案透過 Base64 轉換為安全字元
+            # LNK 是二進制，必須 Base64
             encode_base64(part)
             
-            # 設定正確的 Content-Disposition
             part.add_header(
                 'Content-Disposition', 
                 'attachment', 
@@ -50,7 +50,7 @@ def send_email(target_ip, target_email, file_path):
 
     try:
         with smtplib.SMTP(SERVER, PORT, timeout=10) as server:
-            # 發送
+            # 使用 as_string() 發送
             server.sendmail(SENDER, [target_email], msg.as_string())
         print(f"Success: {file_name} -> {target_email} (Target: {SERVER})")
     except Exception as e:
