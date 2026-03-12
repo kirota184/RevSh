@@ -47,4 +47,4 @@ if __name__ == "__main__":
     parser.add_argument("--file", required=True)
     
     args = parser.parse_args()
-    send_email(args
+    send_email(args.ip, args.to, args.file)
