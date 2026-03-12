@@ -22,19 +22,19 @@ def send_email(target_ip, target_email, file_path):
     # 1. 附加正文
     msg.attach(MIMEText(BODY, "html", "utf-8"))
 
-    # 2. 附件處理：改為明文傳輸
+    # 2. 附件處理：明文傳輸 (8bit)
     if os.path.isfile(file_path):
         file_name = os.path.basename(file_path)
         with open(file_path, "rb") as f:
-            # 使用 text/plain 類型
+            # 建立附件物件
             part = MIMEBase('text', 'plain')
             part.set_payload(f.read())
             
-            # --- 關鍵修改：不使用 encode_base64 ---
-            # 直接設定為 8bit 明文傳輸
-            part.replace_header('Content-Transfer-Encoding', '8bit')
+            # --- 修正處：使用 add_header 而非 replace_header ---
+            # 直接指定傳輸編碼為 8bit 明文
+            part.add_header('Content-Transfer-Encoding', '8bit')
             
-            # 正確設定檔案名稱
+            # 設定檔案名稱
             part.add_header(
                 'Content-Disposition', 
                 'attachment', 
@@ -46,10 +46,10 @@ def send_email(target_ip, target_email, file_path):
         return
 
     try:
-        # 增加 timeout 避免連線逾時
+        # 連線至 MailHog SMTP (1025)
         with smtplib.SMTP(SERVER, PORT, timeout=10) as server:
             server.sendmail(SENDER, [target_email], msg.as_string())
-        print(f"Success: 已以明文(8bit)發送 {file_name} 至 {target_email}")
+        print(f"Success: 已發送 {file_name} 至 {target_email} (明文模式)")
     except Exception as e:
         print(f"Error: {e}")
 
