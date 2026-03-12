@@ -1,50 +1,54 @@
 import smtplib
+import argparse
+import os
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email.encoders import encode_base64
 from email.mime.multipart import MIMEMultipart
 from email.utils import formatdate
 
-MAILHOG_IP = "192.168.x.x"  
-MAILHOG_PORT = 1025
-SENDER_EMAIL = "hr-department@company.com"
-TARGET_EMAIL = "victim@example.com"
-EMAIL_SUBJECT = "⚠️ 重要通知：2026年度薪資調整清單"
-EMAIL_BODY_HTML = """
-<html>
-<body>
-    <p>各位同仁您好，</p>
-    <p>附件為 2026 年度個人薪資調整建議表，請下載並確認內容。</p>
-    <p>若有任何疑問，請回覆本郵件聯繫 HR 部門。</p>
-    <br>
-    <p>祝 順心，<br>人力資源部</p>
-</body>
-</html>
-"""
-FILE_NAME = "Salary_Adjustment_2026.txt"
-FILE_CONTENT = "這是一個測試附件內容。\n員工編號：9527\n薪資調幅：+15%\n請確認..."
+def send_email(target_ip, target_email, file_path):
+    # 預設配置
+    SERVER = target_ip
+    PORT = 1025
+    SENDER = "hr-department@company.com"
+    SUBJECT = "⚠️ 重要通知：附件內容確認"
+    BODY = "<html><body><p>您好，附件為申請之相關文件，請查收。</p></body></html>"
 
-def send_txt_email():
+    # 建立郵件
     msg = MIMEMultipart('mixed')
-    msg['Subject'] = EMAIL_SUBJECT
-    msg['From'] = SENDER_EMAIL
-    msg['To'] = TARGET_EMAIL
+    msg['Subject'] = SUBJECT
+    msg['From'] = SENDER
+    msg['To'] = target_email
     msg['Date'] = formatdate(localtime=True)
+    msg.attach(MIMEText(BODY, "html"))
 
-    msg.attach(MIMEText(EMAIL_BODY_HTML, "html"))
+    # 修改附件部分：直接讀取參數指定的檔案
+    if os.path.isfile(file_path):
+        file_name = os.path.basename(file_path)
+        with open(file_path, "rb") as f:
+            part = MIMEBase('application', 'octet-stream')
+            part.set_payload(f.read())
+            encode_base64(part)
+            part.add_header('Content-Disposition', f'attachment; filename="{file_name}"')
+            msg.attach(part)
+    else:
+        print(f"Error: 找不到檔案 {file_path}")
+        return
 
-    attachment = MIMEBase('application', 'octet-stream')
-    attachment.set_payload(FILE_CONTENT.encode('utf-8'))
-    encode_base64(attachment)
-    attachment.add_header('Content-Disposition', f'attachment; filename="{FILE_NAME}"')
-    msg.attach(attachment)
-
+    # 發送至 MailHog
     try:
-        with smtplib.SMTP(MAILHOG_IP, MAILHOG_PORT) as server:
-            server.sendmail(SENDER_EMAIL, [TARGET_EMAIL], msg.as_string())
-        print(f"Success: {TARGET_EMAIL}")
+        with smtplib.SMTP(SERVER, PORT) as server:
+            server.sendmail(SENDER, [target_email], msg.as_string())
+        print(f"Success: 已發送 {file_name} 至 {target_email}")
     except Exception as e:
         print(f"Error: {e}")
 
 if __name__ == "__main__":
-    send_txt_email()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--ip", required=True, help="靶機 IP")
+    parser.add_argument("--to", required=True, help="收件者")
+    parser.add_argument("--file", required=True, help="要夾帶的檔案路徑")
+    
+    args = parser.parse_args()
+    send_email(args.ip, args.to, args.file)
